@@ -4,7 +4,6 @@
 export const apiRoutes = {
   student: "/api/student",
   classes: "/api/classes",
-  course: "/api/course",
 } as const;
 
 export type ApiRouteKey = keyof typeof apiRoutes;

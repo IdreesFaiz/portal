@@ -1,7 +1,7 @@
 // src/app/api/students/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/db"; // MongoDB connection helper
+import { connectDB } from "@/lib/db";
 import { errorMessage } from "@/lib/error-message";
 import { createStudentController, getStudentsController } from "@/controllers/studentController";
 
