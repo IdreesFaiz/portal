@@ -1,42 +1,49 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import {
-  createClassController,
-  getClassesController,
-} from "@/controllers/classController";
+import { errorMessage, errorStatusCode } from "@/lib/error-message";
+import { safeJson } from "@/lib/safe-json";
+import { createClassSchema, safeParse } from "@/lib/validation";
+import { createClassService, getClassesService } from "@/services/classService";
 
-export async function POST(req: Request) {
+/** GET /api/classes — returns all classes. */
+export async function GET() {
   try {
     await connectDB();
-
-    const body = await req.json();
-
-    console.log("CLASS BODY:", body);
-
-    const result = await createClassController(body);
-
-    return NextResponse.json(result, { status: 201 });
-  } catch (error: any) {
-    console.error("CLASS ERROR:", error);
-
+    const data = await getClassesService();
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Error creating class" },
-      { status: 500 }
+      { success: false, message: errorMessage(error) },
+      { status: errorStatusCode(error) }
     );
   }
 }
 
-export async function GET() {
+/** POST /api/classes — creates a new class (requires auth via middleware). */
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    const data = await getClassesController();
+    const jsonResult = await safeJson(req);
+    if (jsonResult.error) return jsonResult.error;
 
-    return NextResponse.json(data);
-  } catch (error: any) {
+    const parsed = safeParse(createClassSchema, jsonResult.data);
+    if (parsed.error !== undefined) {
+      return NextResponse.json(
+        { success: false, message: parsed.error },
+        { status: 400 }
+      );
+    }
+
+    const result = await createClassService(parsed.data);
     return NextResponse.json(
-      { message: error.message || "Error fetching classes" },
-      { status: 500 }
+      { success: true, data: result },
+      { status: 201 }
+    );
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { success: false, message: errorMessage(error) },
+      { status: errorStatusCode(error) }
     );
   }
 }

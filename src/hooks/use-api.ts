@@ -46,7 +46,7 @@ type MutationOptions<TData, TVariables> = Omit<
 /**
  * POST / PUT / PATCH / DELETE with JSON body (`variables`); uses the same `apiRequest` rules.
  */
-export function useApiMutation<TData, TVariables = unknown>(
+export function useApiMutation<TData, TVariables = void>(
   endpoint: string,
   options?: MutationOptions<TData, TVariables>
 ) {
@@ -56,7 +56,7 @@ export function useApiMutation<TData, TVariables = unknown>(
     mutationFn: (variables) =>
       apiRequest<TData>(endpoint, {
         method,
-        json: variables,
+        ...(variables != null ? { json: variables } : {}),
       }),
   });
 }

@@ -14,7 +14,9 @@ const CourseSchema: Schema = new Schema(
 const ClassSchema: Schema<ClassDocument> = new Schema(
   {
     className: { type: String, required: true },
+    year: { type: Number, required: true, default: () => new Date().getFullYear() },
     courses: { type: [CourseSchema], default: [] },
+    resultsPublished: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
