@@ -9,6 +9,9 @@ import { getMarksByStudentAndClassService } from "@/services/markService";
 import type { CourseMark } from "@/types/mark.types";
 import type { RouteContext } from "@/types/route.types";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 /** Escapes HTML special chars to prevent injection in the PDF template. */
 function esc(value: string): string {
   return value
@@ -18,32 +21,41 @@ function esc(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+let globalBrowser: Browser | null = null;
+
 /**
- * Returns the Chromium executable path.
- * In production (Vercel), uses @sparticuz/chromium's bundled binary.
- * Locally, attempts to find a system-installed Chrome/Chromium.
+ * Creates or reuses a browser instance.
+ * Reuse helps reduce cold-start overhead on warm serverless invocations.
  */
-async function getChromiumPath(): Promise<string> {
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
-    return chromium.executablePath();
+async function getReusableBrowser(
+  puppeteerExecutablePath?: string
+): Promise<Browser> {
+  if (globalBrowser && globalBrowser.isConnected()) {
+    return globalBrowser;
   }
 
-  const localPaths = [
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  const executablePath =
+    puppeteerExecutablePath ?? (await chromium.executablePath());
+  const baseFlags = [
+    "--hide-scrollbars",
+    "--disable-web-security",
+    "--disable-dev-shm-usage",
   ];
+  const launchArgs = puppeteerExecutablePath
+    ? baseFlags
+    : [...chromium.args, ...baseFlags];
 
-  const fs = await import("fs");
-  for (const p of localPaths) {
-    if (fs.existsSync(p)) return p;
+  try {
+    globalBrowser = await puppeteer.launch({
+      headless: true,
+      executablePath,
+      args: launchArgs,
+    });
+    return globalBrowser;
+  } catch (error) {
+    globalBrowser = null;
+    throw error;
   }
-
-  throw new Error(
-    "Chromium not found locally. Install Google Chrome or set CHROME_PATH env var."
-  );
 }
 
 /**
@@ -153,7 +165,7 @@ function buildReportHTML(
 
 /** GET /api/student/:id/report — generates a PDF report card for the student. */
 export async function GET(_req: NextRequest, context: RouteContext) {
-  let browser: Browser | null = null;
+  let page: Awaited<ReturnType<Browser["newPage"]>> | null = null;
 
   try {
     await connectDB();
@@ -177,16 +189,11 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
     const html = buildReportHTML(studentObj, classInfo, courseMarks, totalObtained, totalMax, percentage);
 
-    const executablePath = process.env.CHROME_PATH ?? await getChromiumPath();
-
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: process.env.VERCEL === "1" || process.env.NODE_ENV === "production"
-        ? chromium.args
-        : ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    const page = await browser.newPage();
+    const puppeteerExecutablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ?? process.env.CHROME_PATH;
+    const browser = await getReusableBrowser(puppeteerExecutablePath);
+    page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 0 });
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdfBuffer = await page.pdf({
@@ -200,6 +207,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="report-${String(studentObj.rollNumber ?? id)}.pdf"`,
+        "Cache-Control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=3600",
+        "CDN-Cache-Control":
+          "public, s-maxage=86400, stale-while-revalidate=3600",
+        "Vercel-CDN-Cache-Control":
+          "public, s-maxage=86400, stale-while-revalidate=3600",
       },
     });
   } catch (error: unknown) {
@@ -208,8 +221,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       { status: errorStatusCode(error) }
     );
   } finally {
-    if (browser) {
-      await browser.close();
+    if (page) {
+      await page.close();
     }
   }
 }
