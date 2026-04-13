@@ -32,7 +32,7 @@ async function getReusableBrowser(): Promise<Browser> {
   globalBrowser = await puppeteer.launch({
     args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
     executablePath,
-    headless: "new",
+    headless: true,
     defaultViewport: {
       width: 1200,
       height: 800,
