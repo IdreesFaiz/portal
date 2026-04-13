@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import "@/models/class";
 
 /**
  * Mongoose document interface for Student.
