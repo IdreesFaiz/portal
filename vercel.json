@@ -3,6 +3,5 @@
       "app/api/**": {
         "maxDuration": 30
       }
-    },
-    "installCommand": "npm install"
+    }
   }
