@@ -12,7 +12,6 @@ import type { RouteContext } from "@/types/route.types";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// ✅ Escape HTML
 function esc(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -21,36 +20,28 @@ function esc(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// ✅ Global browser reuse
 let globalBrowser: Browser | null = null;
 
-// ✅ FIXED BROWSER FUNCTION (IMPORTANT)
 async function getReusableBrowser(): Promise<Browser> {
   if (globalBrowser && globalBrowser.isConnected()) {
     return globalBrowser;
   }
 
-  try {
-    const executablePath = await chromium.executablePath();
+  const executablePath = await chromium.executablePath();
 
-    globalBrowser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath,
-      headless: true, 
-      defaultViewport: {
-        width: 1200,
-        height: 800,
-      },
-    });
+  globalBrowser = await puppeteer.launch({
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath,
+    headless: "new",
+    defaultViewport: {
+      width: 1200,
+      height: 800,
+    },
+  });
 
-    return globalBrowser;
-  } catch (error) {
-    globalBrowser = null;
-    throw error;
-  }
+  return globalBrowser;
 }
 
-// ✅ HTML TEMPLATE
 function buildReportHTML(
   student: Record<string, unknown>,
   classInfo: Record<string, unknown>,
@@ -81,7 +72,8 @@ function buildReportHTML(
     )
     .join("");
 
-  return `<!DOCTYPE html>
+  return `
+<!DOCTYPE html>
 <html dir="rtl" lang="ur">
 <head>
 <meta charset="UTF-8" />
@@ -125,7 +117,6 @@ ${courseRows}
 </html>`;
 }
 
-// ✅ API
 export async function GET(_req: NextRequest, context: RouteContext) {
   let page: Awaited<ReturnType<Browser["newPage"]>> | null = null;
 
@@ -144,19 +135,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const marksDoc = await getMarksByStudentAndClassService(id, classId);
 
     const courseMarks: CourseMark[] = marksDoc
-      ? ((marksDoc.toObject() as Record<string, unknown>)
-          .courseMarks as CourseMark[])
+      ? ((marksDoc.toObject() as Record<string, unknown>).courseMarks as CourseMark[])
       : [];
 
-    const totalObtained = courseMarks.reduce(
-      (sum, cm) => sum + cm.obtainedMarks,
-      0
-    );
-    const totalMax = courseMarks.reduce(
-      (sum, cm) => sum + cm.totalMarks,
-      0
-    );
-    const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+    const totalObtained = courseMarks.reduce((s, c) => s + c.obtainedMarks, 0);
+    const totalMax = courseMarks.reduce((s, c) => s + c.totalMarks, 0);
+    const percentage = totalMax ? (totalObtained / totalMax) * 100 : 0;
 
     const html = buildReportHTML(
       studentObj,
@@ -167,25 +151,22 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       percentage
     );
 
-    // ✅ FIX: NO ENV PATH
     const browser = await getReusableBrowser();
-
     page = await browser.newPage();
 
     await page.setViewport({ width: 1200, height: 800 });
 
-    // ✅ Faster for Vercel
     await page.setContent(html, { waitUntil: "domcontentloaded" });
 
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
     });
-    
+
     return new NextResponse(Buffer.from(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="report-${id}.pdf`,
+        "Content-Disposition": `inline; filename="report-${id}.pdf"`,
       },
     });
   } catch (error: unknown) {
