@@ -1,17 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getReusableBrowser } from "@/lib/browser";
+import puppeteer, { type Browser } from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+
 import { connectDB } from "@/lib/db";
 import { validateObjectId } from "@/lib/validate-id";
 import { getStudentByIdService } from "@/services/studentService";
 import { getMarksByStudentAndClassService } from "@/services/markService";
+
 import type { RouteContext } from "@/types/route.types";
 import type { CourseMark } from "@/types/mark.types";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-/* ---------------- ESCAPE HTML ---------------- */
-function esc(value: string): string {
+/* ---------------------------
+   Browser Singleton (Vercel safe)
+---------------------------- */
+let globalBrowser: Browser | null = null;
+
+async function getBrowser() {
+  if (globalBrowser && globalBrowser.isConnected()) {
+    return globalBrowser;
+  }
+
+  const executablePath =
+    process.env.CHROME_PATH || (await chromium.executablePath());
+
+  globalBrowser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: process.env.VERCEL
+      ? chromium.args
+      : ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  return globalBrowser;
+}
+
+/* ---------------------------
+   Escape HTML
+---------------------------- */
+function esc(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -19,7 +48,9 @@ function esc(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/* ---------------- HTML BUILDER ---------------- */
+/* ---------------------------
+   HTML Builder
+---------------------------- */
 function buildHTML(
   student: any,
   classInfo: any,
@@ -35,77 +66,119 @@ function buildHTML(
         <td>${esc(c.courseName)}</td>
         <td>${c.totalMarks}</td>
         <td>${c.obtainedMarks}</td>
-        <td>${((c.obtainedMarks / c.totalMarks) * 100).toFixed(1)}%</td>
+        <td>${
+          c.totalMarks
+            ? ((c.obtainedMarks / c.totalMarks) * 100).toFixed(1)
+            : "0"
+        }%</td>
       </tr>`
     )
     .join("");
 
   return `
-<!DOCTYPE html>
-<html dir="rtl" lang="ur">
-<head>
-<meta charset="UTF-8" />
-<style>
-body { font-family: Arial; padding: 40px; }
-h1 { text-align: center; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-th { background: #333; color: #fff; }
-</style>
-</head>
-<body>
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { font-family: Arial; padding: 30px; }
+      h1 { text-align: center; margin-bottom: 20px; }
+      p { margin: 5px 0; }
 
-<h1>رپورٹ کارڈ</h1>
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
 
-<p>نام: ${esc(student.name)}</p>
-<p>رول نمبر: ${esc(student.rollNumber)}</p>
-<p>کلاس: ${esc(classInfo.className)}</p>
+      th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: right;
+      }
 
-<table>
-<thead>
-<tr>
-<th>سبجیکٹ</th>
-<th>کل نمبر</th>
-<th>حاصل نمبر</th>
-<th>فیصد</th>
-</tr>
-</thead>
-<tbody>
-${rows}
-</tbody>
-</table>
+      th {
+        background: #111;
+        color: #fff;
+      }
 
-<h3>کل حاصل: ${totalObtained} / ${totalMax}</h3>
-<h3>فیصد: ${percentage.toFixed(1)}%</h3>
-<h3>نتیجہ: ${percentage >= 50 ? "پاس" : "فیل"}</h3>
+      .summary {
+        margin-top: 20px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
 
-</body>
-</html>`;
+  <body>
+
+    <h1>Student Report Card</h1>
+
+    <p><b>Name:</b> ${esc(student.name)}</p>
+    <p><b>Roll No:</b> ${esc(student.rollNumber)}</p>
+    <p><b>Email:</b> ${esc(student.email || "")}</p>
+    <p><b>Class:</b> ${esc(classInfo.className || "")}</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Total</th>
+          <th>Obtained</th>
+          <th>%</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+
+    <div class="summary">
+      Total: ${totalObtained} / ${totalMax} <br/>
+      Percentage: ${percentage.toFixed(2)}%
+    </div>
+
+  </body>
+  </html>
+  `;
 }
 
-/* ---------------- API ---------------- */
-export async function GET(req: NextRequest, context: RouteContext) {
+/* ---------------------------
+   MAIN API ROUTE
+---------------------------- */
+export async function GET(_req: NextRequest, context: RouteContext) {
+  let browser: Browser | null = null;
   let page = null;
 
   try {
     await connectDB();
 
-    const { id } = context.params;
+    // ✅ FIX: params is Promise in Next.js
+    const { id } = await context.params;
+
     validateObjectId(id, "Student");
 
     const student = await getStudentByIdService(id);
     const studentObj = student.toObject();
 
-    const classInfo = studentObj.classId;
-    const classId = String(classInfo._id);
+    const classInfo = studentObj.classId || {};
+    const classId = String(classInfo._id || "");
 
     const marksDoc = await getMarksByStudentAndClassService(id, classId);
 
     const courseMarks: CourseMark[] =
       marksDoc?.toObject()?.courseMarks || [];
 
-    const totalObtained = courseMarks.reduce((a, b) => a + b.obtainedMarks, 0);
-    const totalMax = courseMarks.reduce((a, b) => a + b.totalMarks, 0);
+    const totalObtained = courseMarks.reduce(
+      (sum, c) => sum + c.obtainedMarks,
+      0
+    );
+
+    const totalMax = courseMarks.reduce(
+      (sum, c) => sum + c.totalMarks,
+      0
+    );
+
     const percentage = totalMax ? (totalObtained / totalMax) * 100 : 0;
 
     const html = buildHTML(
@@ -117,31 +190,30 @@ export async function GET(req: NextRequest, context: RouteContext) {
       percentage
     );
 
-    const browser = await getReusableBrowser();
+    browser = await getBrowser();
     page = await browser.newPage();
 
-    await page.setViewport({ width: 1200, height: 800 });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    /* ⭐ SAME AS WORKING CODE */
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdfBuffer = await page.pdf({
+    const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
+      margin: { top: "20px", bottom: "20px" },
     });
 
-    return new NextResponse(Buffer.from(pdfBuffer), {
+    return new NextResponse(Buffer.from(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="report-${id}.pdf"`,
-
-        // optional caching like reference code
         "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      {
+        success: false,
+        message: error?.message || "PDF generation failed",
+      },
       { status: 500 }
     );
   } finally {
