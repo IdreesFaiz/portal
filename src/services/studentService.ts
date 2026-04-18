@@ -1,5 +1,6 @@
 import StudentModel from "@/models/student";
 import MarkModel from "@/models/mark";
+import ClassModel from "@/models/class";
 import { NotFoundError, ValidationError } from "@/lib/error-message";
 import type { Student } from "@/types/student.types";
 
@@ -40,12 +41,20 @@ function trimStudentFields(data: Student): Student {
   return trimmed;
 }
 
+async function ensureClassExists(classId: string): Promise<void> {
+  const classExists = await ClassModel.exists({ _id: classId });
+  if (!classExists) {
+    throw new ValidationError("Selected class does not exist");
+  }
+}
+
 /**
  * Creates a new student document after validation and trimming.
  */
 export async function createStudentService(data: Student) {
   const cleaned = trimStudentFields(data);
   validateStudent(cleaned);
+  await ensureClassExists(String(cleaned.classId));
   return await StudentModel.create(cleaned);
 }
 
@@ -96,10 +105,11 @@ export async function getStudentsByClassService(classId: string) {
  * Updates a student by id with the provided partial data.
  * @throws NotFoundError if the student does not exist.
  */
-export async function updateStudentService(
-  id: string,
-  data: Partial<Student>
-) {
+export async function updateStudentService(id: string, data: Partial<Student>) {
+  if (data.classId !== undefined && data.classId !== null) {
+    await ensureClassExists(String(data.classId));
+  }
+
   const student = await StudentModel.findByIdAndUpdate(id, data, {
     new: true,
     runValidators: true,

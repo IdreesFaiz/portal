@@ -10,8 +10,5 @@ import type { StudentWithId } from "@/types/student.types";
  * These students need class assignment from the admin.
  */
 export function useGetDraftStudents() {
-  return useApiQuery<StudentWithId[]>(
-    queryKeys.draftStudents(),
-    apiRoutes.studentDrafts
-  );
+  return useApiQuery<StudentWithId[]>(queryKeys.draftStudents(), apiRoutes.studentDrafts);
 }

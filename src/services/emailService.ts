@@ -105,7 +105,12 @@ export async function sendResultAnnouncementEmails(
   const portalUrl = getBaseUrl();
 
   const emails = students.map((student) => {
-    const html = buildResultEmailHtml(escapeHtml(student.name), escapeHtml(className), year, portalUrl);
+    const html = buildResultEmailHtml(
+      escapeHtml(student.name),
+      escapeHtml(className),
+      year,
+      portalUrl
+    );
     const text = [
       `محترم ${student.name}،`,
       "",

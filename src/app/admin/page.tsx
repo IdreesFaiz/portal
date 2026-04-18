@@ -38,10 +38,21 @@ interface StatCardProps {
   trend?: string;
 }
 
-function StatCard({ title, value, description, href, gradient, shadowColor, icon, trend }: StatCardProps) {
+function StatCard({
+  title,
+  value,
+  description,
+  href,
+  gradient,
+  shadowColor,
+  icon,
+  trend,
+}: StatCardProps) {
   return (
     <Link href={href} className="group block">
-      <div className={`relative overflow-hidden rounded-2xl p-4 sm:p-6 text-white transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-2xl ${gradient} ${shadowColor}`}>
+      <div
+        className={`relative overflow-hidden rounded-2xl p-4 sm:p-6 text-white transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-2xl ${gradient} ${shadowColor}`}
+      >
         <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute bottom-0 left-0 -mb-6 -ml-6 h-32 w-32 rounded-full bg-white/5" />
 
@@ -83,7 +94,9 @@ function QuickAction({ title, description, href, icon, color }: QuickActionProps
   return (
     <Link href={href} className="group block">
       <div className="flex items-center gap-4 bg-white rounded-xl border border-gray-100 p-4 transition-all duration-200 hover:border-gray-200 hover:shadow-md hover:translate-x-[-2px]">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color} transition-transform duration-200 group-hover:scale-110`}>
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color} transition-transform duration-200 group-hover:scale-110`}
+        >
           {icon}
         </div>
         <div className="min-w-0">
@@ -264,9 +277,7 @@ export default function AdminPage() {
 
       {/* Footer Info */}
       <div className="text-center py-2">
-        <p className="text-xs text-gray-400">
-          اسکول مینجمنٹ سسٹم &mdash; v1.0.0
-        </p>
+        <p className="text-xs text-gray-400">اسکول مینجمنٹ سسٹم &mdash; v1.0.0</p>
       </div>
     </div>
   );

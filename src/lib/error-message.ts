@@ -88,12 +88,7 @@ export function errorStatusCode(error: unknown): number {
 
   if (msg.includes("not found")) return 404;
   if (msg.includes("e11000") || msg.includes("duplicate key")) return 409;
-  if (
-    msg.includes("required") ||
-    msg.includes("validation") ||
-    msg.includes("invalid")
-  )
-    return 400;
+  if (msg.includes("required") || msg.includes("validation") || msg.includes("invalid")) return 400;
 
   return 500;
 }

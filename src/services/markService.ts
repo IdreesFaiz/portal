@@ -9,14 +9,10 @@ import type { MarkPayload, CourseMark } from "@/types/mark.types";
 function validateCourseMarks(courseMarks: CourseMark[]): void {
   for (const cm of courseMarks) {
     if (cm.obtainedMarks < 0) {
-      throw new ValidationError(
-        `Obtained marks for "${cm.courseName}" cannot be negative`
-      );
+      throw new ValidationError(`Obtained marks for "${cm.courseName}" cannot be negative`);
     }
     if (cm.totalMarks <= 0) {
-      throw new ValidationError(
-        `Total marks for "${cm.courseName}" must be greater than zero`
-      );
+      throw new ValidationError(`Total marks for "${cm.courseName}" must be greater than zero`);
     }
     if (cm.obtainedMarks > cm.totalMarks) {
       throw new ValidationError(
@@ -84,10 +80,7 @@ export async function bulkUpsertMarksService(entries: MarkPayload[]) {
 /**
  * Returns marks for a specific student in a specific class.
  */
-export async function getMarksByStudentAndClassService(
-  studentId: string,
-  classId: string
-) {
+export async function getMarksByStudentAndClassService(studentId: string, classId: string) {
   return await MarkModel.findOne({ studentId, classId });
 }
 

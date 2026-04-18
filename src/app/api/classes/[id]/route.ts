@@ -40,10 +40,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     const parsed = safeParse(updateClassSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const before = await getClassByIdService(id);
@@ -51,15 +48,10 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     const cls = await updateClassService(id, parsed.data);
 
-    const justPublished =
-      parsed.data.resultsPublished === true && !wasPreviouslyPublished;
+    const justPublished = parsed.data.resultsPublished === true && !wasPreviouslyPublished;
 
     if (justPublished) {
-      void sendResultAnnouncementEmails(
-        id,
-        cls.className,
-        cls.year
-      ).catch((err: unknown) => {
+      void sendResultAnnouncementEmails(id, cls.className, cls.year).catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Unknown error";
         console.error(`[api] Email blast failed: ${msg}`);
       });

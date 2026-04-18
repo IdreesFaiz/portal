@@ -2,21 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, AUTH_COOKIE } from "@/lib/auth";
 
 /** API routes that are publicly accessible without authentication (any method). */
-const PUBLIC_API_ROUTES = [
-  "/api/auth/login",
-  "/api/auth/logout",
-  "/api/student/lookup",
-];
+const PUBLIC_API_ROUTES = ["/api/auth/login", "/api/auth/logout", "/api/student/lookup"];
 
 /** Public GET-only routes — POST/PUT/DELETE still require auth. */
-const PUBLIC_GET_ONLY_ROUTES = [
-  "/api/classes",
-];
+const PUBLIC_GET_ONLY_ROUTES = ["/api/classes"];
 
 /** Dynamic public API patterns — matched with regex. */
-const PUBLIC_API_PATTERNS: RegExp[] = [
-  /^\/api\/student\/[a-f\d]{24}\/report$/i,
-];
+const PUBLIC_API_PATTERNS: RegExp[] = [/^\/api\/student\/[a-f\d]{24}\/report$/i];
 
 /** Checks if a request is publicly accessible. */
 function isPublicApi(pathname: string, method: string): boolean {

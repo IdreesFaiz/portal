@@ -18,18 +18,20 @@ const courseSchema = z.object({
 });
 
 export const createClassSchema = z.object({
-  className: z.string().min(1, "Class name is required").transform((v) => v.trim()),
+  className: z.string().trim().min(1, "Class name is required"),
   year: z.number().int().min(2020).max(2050),
   courses: z.array(courseSchema).default([]),
   resultsPublished: z.boolean().default(false),
 });
 
-export const updateClassSchema = z.object({
-  className: z.string().min(1, "Class name is required").transform((v) => v.trim()),
-  year: z.number().int().min(2020).max(2050),
-  courses: z.array(courseSchema),
-  resultsPublished: z.boolean(),
-}).partial();
+export const updateClassSchema = z
+  .object({
+    className: z.string().trim().min(1, "Class name is required"),
+    year: z.number().int().min(2020).max(2050),
+    courses: z.array(courseSchema),
+    resultsPublished: z.boolean(),
+  })
+  .partial();
 
 /** Schema for promoting students from one class to another. */
 export const promoteStudentsSchema = z.object({
@@ -39,14 +41,35 @@ export const promoteStudentsSchema = z.object({
 /* ──────────────────────── Student ──────────────────────── */
 
 export const createStudentSchema = z.object({
-  registrationNumber: z.string().min(1, "Registration number is required").transform((v) => v.trim()),
-  rollNumber: z.string().min(1, "Roll number is required").transform((v) => v.trim()),
-  name: z.string().min(1, "Name is required").transform((v) => v.trim()),
-  parentName: z.string().min(1, "Parent name is required").transform((v) => v.trim()),
-  email: z.string().email("Valid email is required").transform((v) => v.trim()),
-  phone: z.string().min(1, "Phone number is required").transform((v) => v.trim()),
-  CNIC: z.string().min(1, "CNIC is required").transform((v) => v.trim()),
-  classId: z.string().min(1, "Class ID is required"),
+  registrationNumber: z
+    .string()
+    .min(1, "Registration number is required")
+    .transform((v) => v.trim()),
+  rollNumber: z
+    .string()
+    .min(1, "Roll number is required")
+    .transform((v) => v.trim()),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .transform((v) => v.trim()),
+  parentName: z
+    .string()
+    .min(1, "Parent name is required")
+    .transform((v) => v.trim()),
+  email: z
+    .string()
+    .email("Valid email is required")
+    .transform((v) => v.trim()),
+  phone: z
+    .string()
+    .min(1, "Phone number is required")
+    .transform((v) => v.trim()),
+  CNIC: z
+    .string()
+    .min(1, "CNIC is required")
+    .transform((v) => v.trim()),
+  classId: objectId,
 });
 
 export const updateStudentSchema = createStudentSchema.partial();

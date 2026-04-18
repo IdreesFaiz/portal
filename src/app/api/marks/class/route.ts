@@ -11,10 +11,7 @@ export async function GET(req: NextRequest) {
     const classId = new URL(req.url).searchParams.get("classId");
 
     if (!classId) {
-      return NextResponse.json(
-        { success: false, message: "classId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "classId is required" }, { status: 400 });
     }
 
     validateObjectId(classId, "Class");

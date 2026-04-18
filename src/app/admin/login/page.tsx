@@ -27,7 +27,8 @@ export default function LoginPage() {
         method: "POST",
         json: { email, password },
       });
-      router.push("/admin");
+      router.replace("/admin");
+      router.refresh();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "لاگ ان ناکام";
       setError(msg);
@@ -55,9 +56,7 @@ export default function LoginPage() {
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 to-blue-600 shadow-2xl shadow-indigo-500/40 mb-5">
             <GraduationCap className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            ایڈمن لاگ ان
-          </h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">ایڈمن لاگ ان</h1>
           <p className="text-sm text-slate-400 mt-2">اسکول مینجمنٹ سسٹم میں خوش آمدید</p>
         </div>
 
@@ -101,7 +100,11 @@ export default function LoginPage() {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4.5 h-4.5" />
+                  ) : (
+                    <Eye className="w-4.5 h-4.5" />
+                  )}
                 </button>
               </div>
             </div>

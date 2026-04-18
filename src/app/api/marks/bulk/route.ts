@@ -15,17 +15,11 @@ export async function POST(req: NextRequest) {
 
     const parsed = safeParse(bulkUpsertMarksSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const result = await bulkUpsertMarksService(parsed.data.entries);
-    return NextResponse.json(
-      { success: true, data: result },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: result }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json(
       { success: false, message: errorMessage(error) },

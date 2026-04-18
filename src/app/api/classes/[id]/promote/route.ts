@@ -19,10 +19,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const parsed = safeParse(promoteStudentsSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const { targetClassId } = parsed.data;

@@ -109,17 +109,11 @@ export async function sendMail(options: SendMailOptions): Promise<boolean> {
  * Each recipient gets an individual email (not CC/BCC).
  * @returns Count of successfully sent emails.
  */
-export async function sendBulkMail(
-  recipients: SendMailOptions[]
-): Promise<number> {
+export async function sendBulkMail(recipients: SendMailOptions[]): Promise<number> {
   const mailer = getMailer();
   if (!mailer || recipients.length === 0) return 0;
 
-  const results = await Promise.allSettled(
-    recipients.map((r) => sendMail(r))
-  );
+  const results = await Promise.allSettled(recipients.map((r) => sendMail(r)));
 
-  return results.filter(
-    (r) => r.status === "fulfilled" && r.value === true
-  ).length;
+  return results.filter((r) => r.status === "fulfilled" && r.value === true).length;
 }

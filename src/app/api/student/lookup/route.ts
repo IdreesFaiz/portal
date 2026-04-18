@@ -30,22 +30,24 @@ export async function GET(req: NextRequest) {
     const classDoc = await ClassModel.findById(classId);
 
     if (!classDoc) {
-      return NextResponse.json(
-        { success: false, message: "Class not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: "Class not found" }, { status: 404 });
     }
 
     if (!classDoc.resultsPublished) {
       return NextResponse.json(
-        { success: false, message: "Results for this class have not been published yet. Please check back later." },
+        {
+          success: false,
+          message: "Results for this class have not been published yet. Please check back later.",
+        },
         { status: 403 }
       );
     }
 
     const student = await StudentModel.findOne({
       classId,
-      rollNumber: { $regex: new RegExp(`^${rollNumber.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+      rollNumber: {
+        $regex: new RegExp(`^${rollNumber.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+      },
     }).populate("classId", "className courses year resultsPublished");
 
     if (!student) {
@@ -60,10 +62,24 @@ export async function GET(req: NextRequest) {
       classId,
     });
 
+    const studentObj = student.toObject() as Record<string, unknown>;
+    const studentClass = (studentObj.classId ?? {}) as Record<string, unknown>;
+
     return NextResponse.json({
       success: true,
       data: {
-        student: student.toObject(),
+        student: {
+          _id: String(studentObj._id ?? ""),
+          name: studentObj.name,
+          rollNumber: studentObj.rollNumber,
+          registrationNumber: studentObj.registrationNumber,
+          classId: {
+            className: studentClass.className,
+            year: studentClass.year,
+            courses: studentClass.courses,
+            resultsPublished: studentClass.resultsPublished,
+          },
+        },
         marks: marks ? marks.toObject() : null,
       },
     });

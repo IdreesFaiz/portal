@@ -8,8 +8,5 @@ import type { StudentWithId } from "@/types/student.types";
  * Students are returned with populated classId field.
  */
 export function useGetStudents() {
-  return useApiQuery<StudentWithId[]>(
-    queryKeys.students(),
-    apiRoutes.student
-  );
+  return useApiQuery<StudentWithId[]>(queryKeys.students(), apiRoutes.student);
 }

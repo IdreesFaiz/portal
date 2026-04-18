@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { connectDB } from "@/lib/db";
 import { errorMessage } from "@/lib/error-message";
+import { evaluateFinalResult } from "@/lib/result-status";
 import ClassModel from "@/models/class";
 import StudentModel from "@/models/student";
 import MarkModel from "@/models/mark";
+import type { Course } from "@/types/class.types";
 
 interface CourseMarkDoc {
   courseName: string;
@@ -65,8 +67,10 @@ export async function GET(req: NextRequest) {
         marksMap.set(String(m.studentId), m.courseMarks);
       }
 
-      const courseNames: string[] = (cls.courses as Array<{ name: string; marks: number }>).map(
-        (c) => c.name
+      const courses = cls.courses as Course[];
+      const courseNames: string[] = courses.map((c) => c.name);
+      const courseTotalByName = new Map<string, number>(
+        courses.map((course) => [course.name, course.marks])
       );
 
       const sheet = workbook.addWorksheet(sheetName);
@@ -111,20 +115,23 @@ export async function GET(req: NextRequest) {
         const studentMarks = marksMap.get(studentId) ?? [];
 
         const courseData: number[] = [];
-        let totalObtained = 0;
-        let totalMax = 0;
+        const marksByCourseName = new Map<string, CourseMarkDoc>(
+          studentMarks.map((mark) => [mark.courseName, mark])
+        );
+        const {
+          totalObtained,
+          totalMax,
+          percentage,
+          passed: finalPassed,
+        } = evaluateFinalResult(courses, marksByCourseName);
 
         for (const courseName of courseNames) {
           const cm = studentMarks.find((m) => m.courseName === courseName);
           const obtained = cm?.obtainedMarks ?? 0;
-          const total = cm?.totalMarks ?? 0;
+          const total = courseTotalByName.get(courseName) ?? 0;
           courseData.push(obtained, total);
-          totalObtained += obtained;
-          totalMax += total;
         }
-
-        const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
-        const status = percentage >= 50 ? "پاس" : "فیل";
+        const status = finalPassed ? "پاس" : "فیل";
 
         const row = sheet.addRow([
           idx + 1,
@@ -143,7 +150,7 @@ export async function GET(req: NextRequest) {
         ]);
 
         const statusCell = row.getCell(headerRow.length);
-        if (percentage >= 50) {
+        if (finalPassed) {
           statusCell.font = { bold: true, color: { argb: "FF16A34A" } };
         } else {
           statusCell.font = { bold: true, color: { argb: "FFDC2626" } };
@@ -177,9 +184,7 @@ export async function GET(req: NextRequest) {
 
     const buffer = await workbook.xlsx.writeBuffer();
 
-    const fileName = yearParam
-      ? `students-results-${yearParam}.xlsx`
-      : "students-results-all.xlsx";
+    const fileName = yearParam ? `students-results-${yearParam}.xlsx` : "students-results-all.xlsx";
 
     return new NextResponse(Buffer.from(buffer), {
       status: 200,
@@ -189,9 +194,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { success: false, message: errorMessage(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: errorMessage(error) }, { status: 500 });
   }
 }

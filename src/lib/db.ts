@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const FALLBACK_URI = "mongodb://127.0.0.1:27017/schoolSystem";
 const MONGO_URI = process.env.MONGO_URI ?? FALLBACK_URI;
+const ALLOW_LOCAL_FALLBACK =
+  process.env.NODE_ENV !== "production" && process.env.DB_ALLOW_LOCAL_FALLBACK !== "false";
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -41,7 +43,7 @@ export async function connectDB(): Promise<typeof mongoose> {
       })
       .catch(async (err: Error) => {
         console.error(`[db] Failed to connect to Atlas: ${err.message}`);
-        if (MONGO_URI !== FALLBACK_URI) {
+        if (ALLOW_LOCAL_FALLBACK && MONGO_URI !== FALLBACK_URI) {
           console.info("[db] Trying fallback local MongoDB...");
           return mongoose.connect(FALLBACK_URI, {
             serverSelectionTimeoutMS: 10_000,

@@ -22,9 +22,7 @@ export default function SummaryCard({ label, value, color }: SummaryCardProps) {
   return (
     <div className={`border rounded-lg p-3 text-center ${COLOR_MAP[color] ?? COLOR_MAP.blue}`}>
       <p className="text-xl font-bold">{value}</p>
-      <p className="text-[10px] font-medium uppercase tracking-wider mt-0.5 opacity-70">
-        {label}
-      </p>
+      <p className="text-[10px] font-medium uppercase tracking-wider mt-0.5 opacity-70">{label}</p>
     </div>
   );
 }

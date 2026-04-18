@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from "mongoose";
-import "@/models/class";
 
 /**
  * Mongoose document interface for Student.
@@ -38,7 +37,6 @@ StudentSchema.index({ classId: 1 });
 StudentSchema.index({ rollNumber: 1, classId: 1 });
 
 const StudentModel =
-  mongoose.models.Student ||
-  mongoose.model<StudentDocument>("Student", StudentSchema);
+  mongoose.models.Student || mongoose.model<StudentDocument>("Student", StudentSchema);
 
 export default StudentModel;

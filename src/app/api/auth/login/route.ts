@@ -17,7 +17,10 @@ function checkRateLimit(ip: string): NextResponse | null {
     if (entry.count >= MAX_ATTEMPTS) {
       const retryAfterSec = Math.ceil((entry.resetAt - now) / 1000);
       return NextResponse.json(
-        { success: false, message: `Too many login attempts. Try again in ${retryAfterSec} seconds.` },
+        {
+          success: false,
+          message: `Too many login attempts. Try again in ${retryAfterSec} seconds.`,
+        },
         { status: 429 }
       );
     }
@@ -37,7 +40,9 @@ function resetRateLimit(ip: string): void {
 export async function POST(req: NextRequest) {
   try {
     const forwarded = req.headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0].trim() : (req.headers.get("x-real-ip") ?? "unknown");
+    const ip = forwarded
+      ? forwarded.split(",")[0].trim()
+      : (req.headers.get("x-real-ip") ?? "unknown");
 
     const rateLimited = checkRateLimit(ip);
     if (rateLimited) return rateLimited;
@@ -47,10 +52,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = safeParse(loginSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const { email, password } = parsed.data;
@@ -74,9 +76,6 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Login failed";
-    return NextResponse.json(
-      { success: false, message },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message }, { status: 401 });
   }
 }

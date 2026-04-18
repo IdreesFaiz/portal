@@ -20,7 +20,10 @@ export default function SuccessBanner({ message, onDismiss }: SuccessBannerProps
       </div>
       <p className="flex-1 text-sm text-emerald-700 font-medium">{message}</p>
       {onDismiss && (
-        <button onClick={onDismiss} className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600 transition-colors">
+        <button
+          onClick={onDismiss}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       )}

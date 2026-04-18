@@ -25,11 +25,9 @@ export function useGetMarks(studentId: string, classId: string) {
 export function useGetMarksByClass(classId: string) {
   const endpoint = `${apiRoutes.marksByClass}?classId=${classId}`;
 
-  return useApiQuery<MarkWithId[]>(
-    queryKeys.marksByClass(classId),
-    endpoint,
-    { enabled: classId.length > 0 }
-  );
+  return useApiQuery<MarkWithId[]>(queryKeys.marksByClass(classId), endpoint, {
+    enabled: classId.length > 0,
+  });
 }
 
 /**
@@ -59,18 +57,15 @@ export function useUpsertMarks(studentId: string, classId: string) {
 export function useBulkUpsertMarks(classId: string) {
   const queryClient = useQueryClient();
 
-  return useApiMutation<MarkWithId[], { entries: MarkPayload[] }>(
-    apiRoutes.marksBulk,
-    {
-      method: "POST",
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.marksByClass(classId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.marks(),
-        });
-      },
-    }
-  );
+  return useApiMutation<MarkWithId[], { entries: MarkPayload[] }>(apiRoutes.marksBulk, {
+    method: "POST",
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.marksByClass(classId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.marks(),
+      });
+    },
+  });
 }

@@ -39,10 +39,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     const parsed = safeParse(updateStudentSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const student = await updateStudentService(id, parsed.data);

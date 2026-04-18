@@ -29,17 +29,11 @@ export async function POST(req: NextRequest) {
 
     const parsed = safeParse(createStudentSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const student = await createStudentService(parsed.data);
-    return NextResponse.json(
-      { success: true, data: student },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: student }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json(
       { success: false, message: errorMessage(error) },

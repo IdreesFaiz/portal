@@ -20,7 +20,10 @@ export default function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
       </div>
       <p className="flex-1 text-sm text-red-700 font-medium">{message}</p>
       {onDismiss && (
-        <button onClick={onDismiss} className="flex h-7 w-7 items-center justify-center rounded-lg text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
+        <button
+          onClick={onDismiss}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       )}

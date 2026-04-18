@@ -56,14 +56,20 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
     { title: "جماعتیں", href: "/admin/classes", icon: <BookOpen className="w-5 h-5" /> },
     { title: "نمبرات", href: "/admin/marks", icon: <ClipboardCheck className="w-5 h-5" /> },
     { title: "رزلٹ کارڈز", href: "/admin/results", icon: <FileText className="w-5 h-5" /> },
-    { title: "غیر مختص", href: "/admin/drafts", icon: <FolderOpen className="w-5 h-5" />, badge: draftCount > 0 ? draftCount : undefined },
+    {
+      title: "غیر مختص",
+      href: "/admin/drafts",
+      icon: <FolderOpen className="w-5 h-5" />,
+      badge: draftCount > 0 ? draftCount : undefined,
+    },
   ];
 
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await fetch(apiRoutes.authLogout, { method: "POST" });
-      router.push("/admin/login");
+      await fetch(apiRoutes.authLogout, { method: "POST", cache: "no-store" });
+      router.replace("/admin/login");
+      router.refresh();
     } catch {
       setLoggingOut(false);
     }
@@ -75,7 +81,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   }
 
   const sidebarContent = (
-    <aside className={`${collapsed ? "w-20" : "w-64"} relative bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 text-white min-h-screen flex flex-col transition-all duration-300`}>
+    <aside
+      className={`${collapsed ? "w-20" : "w-64"} relative bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 text-white min-h-screen flex flex-col transition-all duration-300`}
+    >
       <div className="absolute top-0 left-0 w-full h-40 bg-linear-to-b from-indigo-600/10 to-transparent pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-full h-32 bg-linear-to-t from-indigo-900/10 to-transparent pointer-events-none" />
 
@@ -108,7 +116,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         onClick={() => setCollapsed((prev) => !prev)}
         className="hidden lg:flex absolute -left-3 top-[72px] z-20 h-6 w-6 items-center justify-center rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-md"
       >
-        <ChevronLeft className={`w-3.5 h-3.5 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+        <ChevronLeft
+          className={`w-3.5 h-3.5 transition-transform ${collapsed ? "rotate-180" : ""}`}
+        />
       </button>
 
       {/* Navigation */}
@@ -136,9 +146,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
               {active && (
                 <span className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-l-full bg-indigo-400" />
               )}
-              <span className={`shrink-0 ${active ? "text-indigo-400" : ""}`}>
-                {item.icon}
-              </span>
+              <span className={`shrink-0 ${active ? "text-indigo-400" : ""}`}>{item.icon}</span>
               {!collapsed && <span className="flex-1">{item.title}</span>}
               {!collapsed && item.badge !== undefined && (
                 <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold px-1.5">
@@ -174,17 +182,12 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   return (
     <>
       {/* Desktop sidebar — always visible on lg+ */}
-      <div className="hidden lg:block shrink-0">
-        {sidebarContent}
-      </div>
+      <div className="hidden lg:block shrink-0">{sidebarContent}</div>
 
       {/* Mobile overlay drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={onMobileClose}
-          />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onMobileClose} />
           <div className="relative w-64 h-full animate-in slide-in-from-right duration-200">
             {sidebarContent}
           </div>

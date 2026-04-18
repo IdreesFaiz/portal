@@ -49,8 +49,6 @@ const MarkSchema: Schema<MarkDocument> = new Schema(
 
 MarkSchema.index({ studentId: 1, classId: 1 }, { unique: true });
 
-const MarkModel =
-  mongoose.models.Mark ||
-  mongoose.model<MarkDocument>("Mark", MarkSchema);
+const MarkModel = mongoose.models.Mark || mongoose.model<MarkDocument>("Mark", MarkSchema);
 
 export default MarkModel;

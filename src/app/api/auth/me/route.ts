@@ -9,10 +9,7 @@ export async function GET(req: NextRequest) {
   const token = req.cookies.get(AUTH_COOKIE)?.value;
 
   if (!token) {
-    return NextResponse.json(
-      { success: false, message: "Not authenticated" },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 });
   }
 
   const payload = await verifyToken(token);

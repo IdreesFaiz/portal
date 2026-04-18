@@ -68,10 +68,7 @@ export default function DataTable<T>({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {data.map((row, index) => (
-              <tr
-                key={rowKey(row, index)}
-                className="hover:bg-blue-50/40 transition-colors"
-              >
+              <tr key={rowKey(row, index)} className="hover:bg-blue-50/40 transition-colors">
                 {columns.map((col) => (
                   <td key={col.key} className="px-3 sm:px-5 py-2.5 sm:py-3.5">
                     {col.render(row, index)}

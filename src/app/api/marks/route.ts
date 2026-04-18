@@ -4,10 +4,7 @@ import { errorMessage, errorStatusCode } from "@/lib/error-message";
 import { validateObjectId } from "@/lib/validate-id";
 import { safeJson } from "@/lib/safe-json";
 import { upsertMarkSchema, safeParse } from "@/lib/validation";
-import {
-  upsertMarkService,
-  getMarksByStudentAndClassService,
-} from "@/services/markService";
+import { upsertMarkService, getMarksByStudentAndClassService } from "@/services/markService";
 
 /** GET /api/marks?studentId=...&classId=... — returns marks for a student in a class. */
 export async function GET(req: NextRequest) {
@@ -47,17 +44,11 @@ export async function POST(req: NextRequest) {
 
     const parsed = safeParse(upsertMarkSchema, jsonResult.data);
     if (parsed.error !== undefined) {
-      return NextResponse.json(
-        { success: false, message: parsed.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
     }
 
     const result = await upsertMarkService(parsed.data);
-    return NextResponse.json(
-      { success: true, data: result },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: result }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json(
       { success: false, message: errorMessage(error) },

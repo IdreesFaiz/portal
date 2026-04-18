@@ -21,8 +21,6 @@ const ClassSchema: Schema<ClassDocument> = new Schema(
   { timestamps: true }
 );
 
-const ClassModel =
-  mongoose.models.Class ||
-  mongoose.model<ClassDocument>("Class", ClassSchema);
+const ClassModel = mongoose.models.Class || mongoose.model<ClassDocument>("Class", ClassSchema);
 
 export default ClassModel;
