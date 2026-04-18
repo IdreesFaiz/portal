@@ -8,7 +8,6 @@ import { evaluateFinalResult } from "@/lib/result-status";
 import { getStudentByIdService } from "@/services/studentService";
 import { getMarksByStudentAndClassService } from "@/services/markService";
 import type { CourseMark } from "@/types/mark.types";
-import type { Course } from "@/types/class.types";
 import type { RouteContext } from "@/types/route.types";
 
 export const runtime = "nodejs";
@@ -72,11 +71,38 @@ async function getLaunchCandidates(puppeteerExecutablePath?: string): Promise<La
   });
 }
 
+let fontsRegistered = false;
+
+/**
+ * Pre-loads Urdu/Arabic fonts into the Sparticuz Chromium runtime.
+ * Without this, Vercel's bundled Chromium has no Arabic-capable font,
+ * so RTL glyphs render as empty boxes in the generated PDF.
+ *
+ * Safe to call multiple times (no-ops after first successful registration).
+ */
+async function ensureUrduFontsLoaded(): Promise<void> {
+  if (fontsRegistered) return;
+  try {
+    await chromium.font(
+      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf"
+    );
+    await chromium.font(
+      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf"
+    );
+    fontsRegistered = true;
+  } catch {
+    // Font pre-loading is best-effort. The HTML also pulls Google Fonts via
+    // <link>, so the PDF will still render correctly if this step fails.
+  }
+}
+
 async function getReusableBrowser(puppeteerExecutablePath?: string): Promise<Browser> {
   try {
     if (globalBrowser && globalBrowser.isConnected()) {
       return globalBrowser;
     }
+
+    await ensureUrduFontsLoaded();
 
     const baseFlags = ["--hide-scrollbars", "--disable-web-security", "--disable-dev-shm-usage"];
     const candidates = await getLaunchCandidates(puppeteerExecutablePath);
@@ -159,9 +185,15 @@ function buildReportHTML(
 <html dir="rtl" lang="ur">
 <head>
   <meta charset="UTF-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; direction: rtl; }
+    body { font-family: 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; direction: rtl; }
     .header { text-align: center; border-bottom: 3px solid #16213e; padding-bottom: 20px; margin-bottom: 30px; }
     .header h1 { font-size: 28px; color: #16213e; margin-bottom: 4px; }
     .header p { font-size: 14px; color: #555; }
@@ -259,14 +291,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const courseMarks: CourseMark[] = marksDoc
       ? ((marksDoc.toObject() as Record<string, unknown>).courseMarks as CourseMark[])
       : [];
-    const courses = Array.isArray(classInfo.courses) ? (classInfo.courses as Course[]) : [];
-    const marksByCourseName = new Map<string, CourseMark>(
-      courseMarks.map((mark) => [mark.courseName, mark])
-    );
-    const { totalObtained, totalMax, percentage, passed } = evaluateFinalResult(
-      courses,
-      marksByCourseName
-    );
+    const { totalObtained, totalMax, percentage, passed } = evaluateFinalResult(courseMarks);
 
     const html = buildReportHTML(
       studentObj,
@@ -282,10 +307,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 0 });
     await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.evaluateHandle("document.fonts.ready");
 
     const pdfBuffer = await page.pdf({
       width: "1440px",
       printBackground: true,
+      preferCSSPageSize: true,
       margin: { top: "50px", bottom: "64px" },
     });
 

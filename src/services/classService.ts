@@ -2,7 +2,8 @@ import ClassModel from "@/models/class";
 import StudentModel from "@/models/student";
 import MarkModel from "@/models/mark";
 import { NotFoundError, ValidationError } from "@/lib/error-message";
-import type { Class } from "@/types/class.types";
+import { reconcileCourseMarks, type StoredCourseMark } from "@/lib/marks-reconcile";
+import type { Class, Course } from "@/types/class.types";
 
 /**
  * Filters and normalises course entries — removes empty names and zero-mark courses.
@@ -57,8 +58,41 @@ export async function getClassByIdService(id: string) {
 }
 
 /**
+ * Rewrites every stored mark record for a class so that the course names and
+ * per-course totalMarks stay aligned with the class's current courses.
+ *
+ * Called whenever class.courses changes; also usable as a lazy repair pass
+ * for data that drifted before this reconciliation existed.
+ */
+export async function syncMarksWithClassCourses(
+  classId: string,
+  oldCourses: readonly Course[],
+  newCourses: readonly Course[]
+): Promise<void> {
+  const marks = await MarkModel.find({ classId });
+  if (marks.length === 0) return;
+
+  const ops = marks.map((mark) => {
+    const existing = (mark.courseMarks ?? []) as StoredCourseMark[];
+    const reconciled = reconcileCourseMarks(oldCourses, newCourses, existing);
+    return {
+      updateOne: {
+        filter: { _id: mark._id },
+        update: { $set: { courseMarks: reconciled } },
+      },
+    };
+  });
+
+  if (ops.length > 0) {
+    await MarkModel.bulkWrite(ops);
+  }
+}
+
+/**
  * Updates a class by id with the provided partial data.
- * Courses are sanitised before saving.
+ * Courses are sanitised before saving. When courses change (rename, reorder,
+ * add, remove, or max-marks edit) the existing mark records are reconciled so
+ * result cards and marks-entry grids stay in sync with the new course list.
  * @throws NotFoundError if the class does not exist.
  */
 export async function updateClassService(id: string, data: Partial<Class>) {
@@ -74,9 +108,23 @@ export async function updateClassService(id: string, data: Partial<Class>) {
     }
     updateData.year = year;
   }
+
+  let sanitizedCourses: Course[] | null = null;
+  let oldCourses: Course[] = [];
   if (data.courses !== undefined) {
-    updateData.courses = sanitizeCourses(data.courses);
+    const existing = await ClassModel.findById(id);
+    if (!existing) {
+      throw new NotFoundError("Class not found");
+    }
+    const existingCourses = (existing.courses ?? []) as Course[];
+    oldCourses = existingCourses.map((course) => ({
+      name: course.name,
+      marks: course.marks,
+    }));
+    sanitizedCourses = sanitizeCourses(data.courses);
+    updateData.courses = sanitizedCourses;
   }
+
   if (data.resultsPublished !== undefined) {
     updateData.resultsPublished = data.resultsPublished;
   }
@@ -89,6 +137,11 @@ export async function updateClassService(id: string, data: Partial<Class>) {
   if (!cls) {
     throw new NotFoundError("Class not found");
   }
+
+  if (sanitizedCourses !== null) {
+    await syncMarksWithClassCourses(id, oldCourses, sanitizedCourses);
+  }
+
   return cls;
 }
 
@@ -96,17 +149,25 @@ export async function updateClassService(id: string, data: Partial<Class>) {
  * Deletes a class by id.
  * - Deletes all mark records for this class.
  * - Sets classId to null on all students (moves them to "draft" state).
+ *
+ * Dependant writes (mark deletion, student detachment) run before the class
+ * itself is removed so a partial failure cannot leave orphan marks or
+ * students pointing at a missing class.
  * @throws NotFoundError if the class does not exist.
  */
 export async function deleteClassService(id: string) {
-  const cls = await ClassModel.findByIdAndDelete(id);
-  if (!cls) {
+  const exists = await ClassModel.exists({ _id: id });
+  if (!exists) {
     throw new NotFoundError("Class not found");
   }
 
   await MarkModel.deleteMany({ classId: id });
   await StudentModel.updateMany({ classId: id }, { $set: { classId: null } });
 
+  const cls = await ClassModel.findByIdAndDelete(id);
+  if (!cls) {
+    throw new NotFoundError("Class not found");
+  }
   return cls;
 }
 

@@ -123,13 +123,20 @@ export async function updateStudentService(id: string, data: Partial<Student>) {
 
 /**
  * Deletes a student by id and all their mark records.
+ * Dependants (marks) are removed first so a partial failure never leaves
+ * orphan mark records pointing at a non-existent student.
  * @throws NotFoundError if the student does not exist.
  */
 export async function deleteStudentService(id: string) {
+  const exists = await StudentModel.exists({ _id: id });
+  if (!exists) {
+    throw new NotFoundError("Student not found");
+  }
+
+  await MarkModel.deleteMany({ studentId: id });
   const student = await StudentModel.findByIdAndDelete(id);
   if (!student) {
     throw new NotFoundError("Student not found");
   }
-  await MarkModel.deleteMany({ studentId: id });
   return student;
 }

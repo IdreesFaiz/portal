@@ -100,13 +100,7 @@ export default function ResultLookupPage() {
   const courses: Course[] = classInfo?.courses ?? [];
   const courseMarks: CourseMark[] = marks?.courseMarks ?? [];
   const hasMarks = courseMarks.length > 0;
-  const marksByCourseName = new Map<string, CourseMark>(
-    courseMarks.map((mark) => [mark.courseName, mark])
-  );
-  const { totalMax, totalObtained, percentage, passed } = evaluateFinalResult(
-    courses,
-    marksByCourseName
-  );
+  const { totalMax, totalObtained, percentage, passed } = evaluateFinalResult(courseMarks);
 
   return (
     <div className="min-h-screen bg-gray-50">

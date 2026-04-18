@@ -1,0 +1,6 @@
+node (project pinned): v22.14.0 in .node-version
+node (engines requirement): >=18 in root package.json
+node (abhi terminal/runtime): v23.1.0 (node -v)
+next: 15.4.10 (defined in pnpm-workspace.yaml catalog, lockfile bhi same)
+puppeteer-core: 23.11.1 (catalog + lockfile same)
+@sparticuz/chromium: 143.0.0 (catalog + lockfile same)

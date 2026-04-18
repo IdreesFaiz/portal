@@ -8,7 +8,6 @@ import { getClassId } from "@/lib/class-helpers";
 import { evaluateFinalResult } from "@/lib/result-status";
 import type { StudentWithId } from "@/types/student.types";
 import type { ClassWithId, Course } from "@/types/class.types";
-import type { CourseMark } from "@/types/mark.types";
 
 interface ResultCardModalProps {
   open: boolean;
@@ -33,13 +32,7 @@ export default function ResultCardModal({ open, onClose, student }: ResultCardMo
   const className = classInfo?.className ?? "—";
   const courses: Course[] = classInfo?.courses ?? [];
   const courseMarks = marksData?.courseMarks ?? [];
-  const marksByCourseName = new Map<string, CourseMark>(
-    courseMarks.map((mark) => [mark.courseName, mark])
-  );
-  const { totalMax, totalObtained, percentage, passed } = evaluateFinalResult(
-    courses,
-    marksByCourseName
-  );
+  const { totalMax, totalObtained, percentage, passed } = evaluateFinalResult(courseMarks);
   const hasMarks = courseMarks.length > 0;
 
   return (

@@ -3,6 +3,11 @@ import ExcelJS from "exceljs";
 import { connectDB } from "@/lib/db";
 import { errorMessage } from "@/lib/error-message";
 import { evaluateFinalResult } from "@/lib/result-status";
+import {
+  marksNeedReconciliation,
+  reconcileCourseMarks,
+  type StoredCourseMark,
+} from "@/lib/marks-reconcile";
 import ClassModel from "@/models/class";
 import StudentModel from "@/models/student";
 import MarkModel from "@/models/mark";
@@ -60,14 +65,44 @@ export async function GET(req: NextRequest) {
       const sheetName = `${String(cls.className)} (${cls.year})`.substring(0, 31);
 
       const students = await StudentModel.find({ classId }).sort({ rollNumber: 1 }).lean();
-      const marks = (await MarkModel.find({ classId }).lean()) as unknown as MarkDoc[];
+      const courses = cls.courses as Course[];
+
+      const driftedOps: {
+        updateOne: {
+          filter: { _id: unknown };
+          update: { $set: { courseMarks: StoredCourseMark[] } };
+        };
+      }[] = [];
+      const rawMarks = (await MarkModel.find({ classId }).lean()) as unknown as (MarkDoc & {
+        _id: unknown;
+      })[];
 
       const marksMap = new Map<string, CourseMarkDoc[]>();
-      for (const m of marks) {
-        marksMap.set(String(m.studentId), m.courseMarks);
+      for (const m of rawMarks) {
+        let studentMarks = m.courseMarks;
+        if (courses.length > 0 && marksNeedReconciliation(courses, studentMarks)) {
+          const inferredOld: Course[] = studentMarks.map((cm) => ({
+            name: cm.courseName,
+            marks: cm.totalMarks,
+          }));
+          studentMarks = reconcileCourseMarks(inferredOld, courses, studentMarks);
+          driftedOps.push({
+            updateOne: {
+              filter: { _id: m._id },
+              update: { $set: { courseMarks: studentMarks } },
+            },
+          });
+        }
+        marksMap.set(String(m.studentId), studentMarks);
       }
 
-      const courses = cls.courses as Course[];
+      if (driftedOps.length > 0) {
+        try {
+          await MarkModel.bulkWrite(driftedOps);
+        } catch {
+          // Best-effort repair — export still uses the reconciled data in memory.
+        }
+      }
       const courseNames: string[] = courses.map((c) => c.name);
       const courseTotalByName = new Map<string, number>(
         courses.map((course) => [course.name, course.marks])
@@ -115,15 +150,12 @@ export async function GET(req: NextRequest) {
         const studentMarks = marksMap.get(studentId) ?? [];
 
         const courseData: number[] = [];
-        const marksByCourseName = new Map<string, CourseMarkDoc>(
-          studentMarks.map((mark) => [mark.courseName, mark])
-        );
         const {
           totalObtained,
           totalMax,
           percentage,
           passed: finalPassed,
-        } = evaluateFinalResult(courses, marksByCourseName);
+        } = evaluateFinalResult(studentMarks);
 
         for (const courseName of courseNames) {
           const cm = studentMarks.find((m) => m.courseName === courseName);

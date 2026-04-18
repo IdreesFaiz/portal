@@ -3,8 +3,8 @@ import { connectDB } from "@/lib/db";
 import { errorMessage, errorStatusCode } from "@/lib/error-message";
 import { validateObjectId } from "@/lib/validate-id";
 import StudentModel from "@/models/student";
-import MarkModel from "@/models/mark";
 import ClassModel from "@/models/class";
+import { getMarksByStudentAndClassService } from "@/services/markService";
 
 /**
  * GET /api/student/lookup?classId=xxx&rollNumber=yyy
@@ -57,10 +57,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const marks = await MarkModel.findOne({
-      studentId: student._id,
-      classId,
-    });
+    const marks = await getMarksByStudentAndClassService(String(student._id), classId);
 
     const studentObj = student.toObject() as Record<string, unknown>;
     const studentClass = (studentObj.classId ?? {}) as Record<string, unknown>;
