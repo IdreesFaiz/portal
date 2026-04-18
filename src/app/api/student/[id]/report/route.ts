@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import { connectDB } from "@/lib/db";
@@ -14,6 +15,40 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 let globalBrowser: Browser | null = null;
+let fontsRegistered = false;
+
+/**
+ * Registers the bundled Arabic/Urdu font files with the Chromium runtime via
+ * fontconfig. `chromium.font()` accepts local paths and symlinks them into
+ * the fontconfig scan directory, so Chromium can render RTL glyphs natively.
+ *
+ * This must run BEFORE the browser is launched. Bundling the TTFs (see
+ * `src/assets/fonts/` and `outputFileTracingIncludes` in next.config.ts)
+ * makes PDF generation independent of outbound network on Vercel.
+ *
+ * Safe to call multiple times — after the first successful registration
+ * subsequent calls are cheap.
+ */
+async function ensureUrduFontsLoaded(): Promise<void> {
+  if (fontsRegistered) return;
+
+  const candidates = [
+    "src/assets/fonts/NotoNaskhArabic-Regular.ttf",
+    "src/assets/fonts/NotoNaskhArabic-Bold.ttf",
+  ];
+
+  for (const rel of candidates) {
+    try {
+      const absolute = path.join(process.cwd(), rel);
+      await chromium.font(absolute);
+    } catch {
+      // Font registration is best-effort. If one file fails we still try the
+      // rest and let the browser fall back to whatever glyphs it can find.
+    }
+  }
+
+  fontsRegistered = true;
+}
 
 interface LaunchCandidate {
   executablePath: string;
@@ -71,37 +106,14 @@ async function getLaunchCandidates(puppeteerExecutablePath?: string): Promise<La
   });
 }
 
-let fontsRegistered = false;
-
-/**
- * Pre-loads Urdu/Arabic fonts into the Sparticuz Chromium runtime.
- * Without this, Vercel's bundled Chromium has no Arabic-capable font,
- * so RTL glyphs render as empty boxes in the generated PDF.
- *
- * Safe to call multiple times (no-ops after first successful registration).
- */
-async function ensureUrduFontsLoaded(): Promise<void> {
-  if (fontsRegistered) return;
-  try {
-    await chromium.font(
-      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf"
-    );
-    await chromium.font(
-      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf"
-    );
-    fontsRegistered = true;
-  } catch {
-    // Font pre-loading is best-effort. The HTML also pulls Google Fonts via
-    // <link>, so the PDF will still render correctly if this step fails.
-  }
-}
-
 async function getReusableBrowser(puppeteerExecutablePath?: string): Promise<Browser> {
   try {
     if (globalBrowser && globalBrowser.isConnected()) {
       return globalBrowser;
     }
 
+    // Register Arabic fonts with fontconfig BEFORE Chromium launches, otherwise
+    // the font cache won't pick them up and Urdu glyphs will render blank.
     await ensureUrduFontsLoaded();
 
     const baseFlags = ["--hide-scrollbars", "--disable-web-security", "--disable-dev-shm-usage"];
@@ -152,7 +164,9 @@ function esc(value: string): string {
 
 /**
  * Builds the HTML report card template in Urdu with RTL layout.
- * All user-supplied strings are escaped before interpolation.
+ * All user-supplied strings are escaped before interpolation. Fonts are
+ * registered with Chromium at launch via `chromium.font()` using bundled
+ * TTFs — no external network is required.
  */
 function buildReportHTML(
   student: Record<string, unknown>,
@@ -181,19 +195,20 @@ function buildReportHTML(
     )
     .join("");
 
+  // Coerce `passed` into a strict boolean and pick a robust status label.
+  // We deliberately include the English word alongside the Urdu one so the
+  // status is always visible even if a specific glyph ever fails to render.
+  const isPassed = passed === true;
+  const statusLabel = isPassed ? "پاس / PASS" : "فیل / FAIL";
+  const statusColor = isPassed ? "#1b7f3a" : "#c1272d";
+
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ur">
 <head>
   <meta charset="UTF-8" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; direction: rtl; }
+    body { font-family: "Noto Naskh Arabic", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; direction: rtl; }
     .header { text-align: center; border-bottom: 3px solid #16213e; padding-bottom: 20px; margin-bottom: 30px; }
     .header h1 { font-size: 28px; color: #16213e; margin-bottom: 4px; }
     .header p { font-size: 14px; color: #555; }
@@ -207,7 +222,8 @@ function buildReportHTML(
     tr:nth-child(even) td { background: #f7f8fc; }
     .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 30px; }
     .summary-card { background: #f0f4ff; border-radius: 8px; padding: 16px; text-align: center; }
-    .summary-card .number { font-size: 28px; font-weight: 700; color: #16213e; }
+    .summary-card .number { font-size: 24px; font-weight: 700; color: #16213e; }
+    .summary-card .status { font-size: 22px; font-weight: 700; }
     .summary-card .desc { font-size: 12px; color: #666; margin-top: 4px; letter-spacing: 0.5px; }
     .footer { text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0; color: #888; font-size: 12px; }
   </style>
@@ -250,7 +266,7 @@ function buildReportHTML(
       <div class="desc">فیصد</div>
     </div>
     <div class="summary-card">
-      <div class="number">${passed ? "پاس" : "فیل"}</div>
+      <div class="status" style="color: ${statusColor};">${statusLabel}</div>
       <div class="desc">حیثیت</div>
     </div>
   </div>
