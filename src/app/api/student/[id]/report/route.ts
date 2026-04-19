@@ -208,15 +208,36 @@ function buildReportHTML(
 <head>
   <meta charset="UTF-8" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <!--
+    Vercel/serverless Chromium (@sparticuz/chromium) ships WITHOUT any Urdu
+    fonts, so Nastaliq glyphs render as empty rectangles or fall back to a
+    Latin font. Loading Noto Nastaliq Urdu + Noto Naskh Arabic from Google
+    Fonts CDN is the simplest reliable fix — Chromium fetches them at
+    runtime and \`networkidle0\` + \`document.fonts.ready\` ensure they're
+    rendered before we capture the PDF. Local dev still uses installed
+    system fonts via the family fallback chain.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap"
+  />
   <style>
     @page { size: A4 portrait; margin: 12mm; }
     /* Global Urdu-friendly line-height + safer baseline so Nastaliq
        descenders don't clip against borders or the next line. */
     body {
-      font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       line-height: 1.7;
+      /* Nastaliq is visually busier than Naskh; nudge body size up a touch
+         so it stays legible at A4 print scale. */
+      font-size: 14px;
     }
-    h1, h2, h3 { line-height: 1.4; }
+    h1, h2, h3 { line-height: 1.5; }
+    /* Numerals look cleaner in Naskh — Nastaliq digits can feel cramped
+       inside table cells. Apply Naskh only to plain digit cells. */
+    .num { font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif; }
   </style>
 </head>
 <body class="bg-white text-black" style="direction: rtl;">
@@ -380,6 +401,16 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     // unstyled document. `networkidle0` waits until the network is quiet,
     // which gives the CDN time to fetch + compile before rendering.
     await page.setContent(html, { waitUntil: "networkidle0" });
+
+    // `networkidle0` doesn't guarantee that webfonts (Noto Nastaliq Urdu /
+    // Noto Naskh Arabic from Google Fonts) have finished registering with
+    // the FontFaceSet. Without this wait, the first PDF on a cold lambda
+    // sometimes captures Urdu text rendered with a Latin fallback before
+    // the real font swaps in. `document.fonts.ready` resolves only once
+    // every declared @font-face is loaded and ready to render.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
 
     const pdfBuffer = await page.pdf({
       format: "A4",
