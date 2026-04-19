@@ -145,9 +145,7 @@ export default function AdminPage() {
               <Sparkles className="w-5 h-5 text-amber-400" />
               <span className="text-sm font-medium text-white/70">{getGreeting()}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              اسکول ایڈمن ڈیش بورڈ
-            </h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">ایڈمن ڈیش بورڈ</h1>
             <div className="flex items-center gap-3 mt-3 text-sm text-white/50">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
@@ -273,11 +271,6 @@ export default function AdminPage() {
             />
           </div>
         </div>
-      </div>
-
-      {/* Footer Info */}
-      <div className="text-center py-2">
-        <p className="text-xs text-gray-400">اسکول مینجمنٹ سسٹم &mdash; v1.0.0</p>
       </div>
     </div>
   );

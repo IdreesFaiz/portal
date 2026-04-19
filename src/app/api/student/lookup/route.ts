@@ -70,6 +70,13 @@ export async function GET(req: NextRequest) {
           name: studentObj.name,
           rollNumber: studentObj.rollNumber,
           registrationNumber: studentObj.registrationNumber,
+          // Personal details exposed so the public result card can mirror the
+          // printable PDF layout (نام امیدوار / ولدیت / شناختی کارڈ / فون).
+          // Lookup still requires classId + rollNumber, so this is intentional
+          // — admins should restrict this further if privacy regulations apply.
+          parentName: studentObj.parentName,
+          CNIC: studentObj.CNIC,
+          phone: studentObj.phone,
           classId: {
             className: studentClass.className,
             year: studentClass.year,

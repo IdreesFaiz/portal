@@ -41,9 +41,6 @@ function buildResultEmailHtml(
           <h1 style="color:#ffffff; margin:0; font-size:22px; font-weight:700;">
             نتائج کا اعلان
           </h1>
-          <p style="color:#94a3b8; margin:8px 0 0; font-size:13px;">
-            اسکول مینجمنٹ سسٹم
-          </p>
         </div>
 
         <div style="padding:32px 24px;">
@@ -73,7 +70,7 @@ function buildResultEmailHtml(
 
         <div style="background:#f8fafc; padding:20px 24px; border-top:1px solid #e2e8f0; text-align:center;">
           <p style="color:#94a3b8; font-size:11px; margin:0;">
-            یہ اسکول مینجمنٹ سسٹم کی طرف سے خودکار اطلاع ہے۔<br/>
+            یہ ایک خودکار اطلاع ہے۔<br/>
             براہ کرم اس ای میل کا جواب نہ دیں۔
           </p>
         </div>
@@ -117,7 +114,7 @@ export async function sendResultAnnouncementEmails(
       `${className} (${year}) کے نتائج شائع کر دیے گئے ہیں۔`,
       `اپنا رزلٹ کارڈ دیکھنے کے لیے طالب علم نتائج پورٹل پر جائیں: ${portalUrl}`,
       "",
-      "یہ اسکول مینجمنٹ سسٹم کی طرف سے خودکار اطلاع ہے۔",
+      "یہ ایک خودکار اطلاع ہے۔",
     ].join("\n");
 
     return {

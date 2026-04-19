@@ -4,7 +4,7 @@ import chromium from "@sparticuz/chromium";
 import { connectDB } from "@/lib/db";
 import { errorMessage, errorStatusCode } from "@/lib/error-message";
 import { validateObjectId } from "@/lib/validate-id";
-import { evaluateFinalResult } from "@/lib/result-status";
+import { evaluateFinalResult, computeGradeLabel } from "@/lib/result-status";
 import { getStudentByIdService } from "@/services/studentService";
 import { getMarksByStudentAndClassService } from "@/services/markService";
 import type { CourseMark } from "@/types/mark.types";
@@ -58,9 +58,14 @@ async function getLaunchCandidates(puppeteerExecutablePath?: string): Promise<La
     }
   }
 
-  const sparticuzPath = await chromium.executablePath();
-  if (sparticuzPath) {
-    candidates.push({ executablePath: sparticuzPath, useChromiumFlags: true });
+  try {
+    const sparticuzPath = await chromium.executablePath();
+    if (sparticuzPath) {
+      candidates.push({ executablePath: sparticuzPath, useChromiumFlags: true });
+    }
+  } catch {
+    // If sparticuz can't resolve an executable (e.g. local dev without the
+    // bundled binary), we'll rely on the other candidates above.
   }
 
   const seen = new Set<string>();
@@ -71,38 +76,11 @@ async function getLaunchCandidates(puppeteerExecutablePath?: string): Promise<La
   });
 }
 
-let fontsRegistered = false;
-
-/**
- * Pre-loads Urdu/Arabic fonts into the Sparticuz Chromium runtime.
- * Without this, Vercel's bundled Chromium has no Arabic-capable font,
- * so RTL glyphs render as empty boxes in the generated PDF.
- *
- * Safe to call multiple times (no-ops after first successful registration).
- */
-async function ensureUrduFontsLoaded(): Promise<void> {
-  if (fontsRegistered) return;
-  try {
-    await chromium.font(
-      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf"
-    );
-    await chromium.font(
-      "https://raw.githubusercontent.com/google/fonts/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf"
-    );
-    fontsRegistered = true;
-  } catch {
-    // Font pre-loading is best-effort. The HTML also pulls Google Fonts via
-    // <link>, so the PDF will still render correctly if this step fails.
-  }
-}
-
 async function getReusableBrowser(puppeteerExecutablePath?: string): Promise<Browser> {
   try {
     if (globalBrowser && globalBrowser.isConnected()) {
       return globalBrowser;
     }
-
-    await ensureUrduFontsLoaded();
 
     const baseFlags = ["--hide-scrollbars", "--disable-web-security", "--disable-dev-shm-usage"];
     const candidates = await getLaunchCandidates(puppeteerExecutablePath);
@@ -163,101 +141,177 @@ function buildReportHTML(
   percentage: number,
   passed: boolean
 ): string {
-  const studentName = esc(String(student.name ?? ""));
-  const rollNumber = esc(String(student.rollNumber ?? ""));
-  const email = esc(String(student.email ?? ""));
-  const registrationNumber = esc(String(student.registrationNumber ?? ""));
-  const className = esc(String(classInfo.className ?? ""));
+  const studentName = esc(String(student.name ?? "-"));
+  const parentName = esc(String(student.parentName ?? "-"));
+  const rollNumber = esc(String(student.rollNumber ?? "-"));
+  const registrationNumber = esc(String(student.registrationNumber ?? "-"));
+  const cnic = esc(String(student.CNIC ?? "-"));
+  const phone = esc(String(student.phone ?? "-"));
+  const className = esc(String(classInfo.className ?? "-"));
+  const classYear = esc(String(classInfo.year ?? new Date().getFullYear()));
+
+  // Uniform light-dotted gray border for every cell. We use
+  // `border-separate` + `border-spacing: 0` on the parent <table> so Chromium
+  // actually renders the dotted pattern in the PDF — `border-collapse` would
+  // flatten dotted/dashed styles to solid lines.
+  //
+  // `leading-7` is critical for Urdu Nastaliq script: its glyphs have tall
+  // ascenders + deep descenders that touch / clip cell borders with the
+  // default `leading-normal` (1.5). Combined with `py-2.5`, this gives Urdu
+  // text room to breathe and avoids top/bottom overlap.
+  const cellBase = "border border-dotted border-gray-400 px-3 py-2.5 align-middle leading-7";
+  const tableBase =
+    'class="w-full text-[14px] mb-6" style="border-spacing:0; border-collapse:separate;"';
+
+  // Renders a "Label: Value" pair using flex-wrap so the colon stays attached
+  // to the label and long values wrap to a new line cleanly without
+  // overlapping the label glyph (a common Urdu-Nastaliq rendering issue).
+  // `word-break: break-word` is inlined as plain CSS instead of a Tailwind
+  // utility because the PDF runs Tailwind via the v3 Play CDN.
+  const infoLine = (label: string, value: string) =>
+    `<div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 leading-7">
+      <span class="font-extrabold shrink-0">${esc(label)}:</span>
+      <span class="min-w-0" style="word-break: break-word;">${value}</span>
+    </div>`;
 
   const courseRows = courseMarks
-    .map(
-      (cm) => `
+    .map((cm, idx) => {
+      const serial = String(idx + 1).padStart(2, "0");
+      const subjectPct = cm.totalMarks > 0 ? (cm.obtainedMarks / cm.totalMarks) * 100 : 0;
+      const subjectStatus = subjectPct >= 50 ? "پاس" : "فیل";
+      return `
       <tr>
-        <td>${esc(cm.courseName)}</td>
-        <td>${cm.totalMarks}</td>
-        <td>${cm.obtainedMarks}</td>
-        <td>${cm.totalMarks > 0 ? ((cm.obtainedMarks / cm.totalMarks) * 100).toFixed(1) : "0.0"}%</td>
-      </tr>`
-    )
+        <td class="${cellBase} text-center w-16">${serial}</td>
+        <td class="${cellBase}">${esc(cm.courseName)}</td>
+        <td class="${cellBase} text-center w-24">${cm.totalMarks}</td>
+        <td class="${cellBase} text-center w-32">${cm.obtainedMarks}</td>
+        <td class="${cellBase} text-center w-24">${subjectStatus}</td>
+      </tr>`;
+    })
     .join("");
+
+  const resultLabel = passed ? "کامیاب" : "ناکام";
+  const gradeLabel = computeGradeLabel(percentage, passed);
+
+  const printTimestamp = new Date().toLocaleString("en-GB", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ur">
 <head>
   <meta charset="UTF-8" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; direction: rtl; }
-    .header { text-align: center; border-bottom: 3px solid #16213e; padding-bottom: 20px; margin-bottom: 30px; }
-    .header h1 { font-size: 28px; color: #16213e; margin-bottom: 4px; }
-    .header p { font-size: 14px; color: #555; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
-    .info-item { display: flex; gap: 8px; }
-    .info-item .label { font-weight: 600; color: #16213e; min-width: 140px; }
-    .info-item .value { color: #333; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-    th { background: #16213e; color: #fff; padding: 10px 14px; text-align: right; font-size: 13px; letter-spacing: 0.5px; }
-    td { padding: 10px 14px; border-bottom: 1px solid #e0e0e0; font-size: 14px; text-align: right; }
-    tr:nth-child(even) td { background: #f7f8fc; }
-    .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 30px; }
-    .summary-card { background: #f0f4ff; border-radius: 8px; padding: 16px; text-align: center; }
-    .summary-card .number { font-size: 28px; font-weight: 700; color: #16213e; }
-    .summary-card .desc { font-size: 12px; color: #666; margin-top: 4px; letter-spacing: 0.5px; }
-    .footer { text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0; color: #888; font-size: 12px; }
+    @page { size: A4 portrait; margin: 12mm; }
+    /* Global Urdu-friendly line-height + safer baseline so Nastaliq
+       descenders don't clip against borders or the next line. */
+    body {
+      font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.7;
+    }
+    h1, h2, h3 { line-height: 1.4; }
   </style>
 </head>
-<body>
-  <div class="header">
-    <h1>رپورٹ کارڈ</h1>
-    <p>اسکول مینجمنٹ سسٹم</p>
+<body class="bg-white text-black" style="direction: rtl;">
+
+  <!-- Header -->
+  <div class="flex items-center gap-4 pb-4 border-b border-dotted border-gray-400 mb-6">
+    <div class="shrink-0 w-24 h-24 rounded-full border-2 border-gray-500 flex flex-col items-center justify-center text-center leading-snug px-2 gap-0.5">
+      <div class="text-[12px] font-extrabold">شعبہ</div>
+      <div class="text-[12px] font-extrabold">امتحانات</div>
+    </div>
+    <div class="flex-1 min-w-0 text-center">
+      <div class="text-[15px] font-extrabold mb-2 leading-snug">شعبہ امتحانات</div>
+      <h1 class="text-[24px] font-extrabold mb-2 leading-snug">نتیجہ کارڈ سالانہ امتحان ${classYear}</h1>
+      <h2 class="text-[18px] font-extrabold leading-snug">${className}</h2>
+    </div>
+    <div class="shrink-0 w-24"></div>
   </div>
 
-  <div class="info-grid">
-    <div class="info-item"><span class="label">طالب علم کا نام:</span><span class="value">${studentName}</span></div>
-    <div class="info-item"><span class="label">رول نمبر:</span><span class="value">${rollNumber}</span></div>
-    <div class="info-item"><span class="label">رجسٹریشن نمبر:</span><span class="value">${registrationNumber}</span></div>
-    <div class="info-item"><span class="label">ای میل:</span><span class="value">${email}</span></div>
-    <div class="info-item"><span class="label">جماعت:</span><span class="value">${className}</span></div>
-  </div>
-
-  <table>
-    <thead>
+  <!-- Student info -->
+  <table ${tableBase}>
+    <tbody>
       <tr>
-        <th>مضمون</th>
-        <th>کل نمبر</th>
-        <th>حاصل نمبر</th>
-        <th>فیصد</th>
+        <td class="${cellBase} align-top w-1/3">${infoLine("نام امیدوار", studentName)}</td>
+        <td class="${cellBase} align-top w-1/3">${infoLine("ولدیت", parentName)}</td>
+        <td class="${cellBase} align-top w-1/3">${infoLine("رول نمبر", rollNumber)}</td>
+      </tr>
+      <tr>
+        <td class="${cellBase} align-top">${infoLine("شناختی کارڈ", cnic)}</td>
+        <td class="${cellBase} align-top">${infoLine("فون نمبر", phone)}</td>
+        <td class="${cellBase} align-top">${infoLine("رجسٹریشن", registrationNumber)}</td>
+      </tr>
+      <tr>
+        <td class="${cellBase} align-top" colspan="3">${infoLine("نام ادارہ", `${className} - سال ${classYear}`)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Results -->
+  <table ${tableBase}>
+    <thead>
+      <tr class="bg-gray-50">
+        <th class="${cellBase} text-center font-extrabold">نمبر شمار</th>
+        <th class="${cellBase} text-center font-extrabold">مضامین</th>
+        <th class="${cellBase} text-center font-extrabold">کل نمبر</th>
+        <th class="${cellBase} text-center font-extrabold">حاصل کردہ نمبر</th>
+        <th class="${cellBase} text-center font-extrabold">کیفیت</th>
       </tr>
     </thead>
     <tbody>
       ${courseRows}
+
+      <!-- Total Row -->
+      <tr class="bg-gray-50">
+        <td class="${cellBase} text-center font-extrabold" colspan="2">میزان</td>
+        <td class="${cellBase} text-center font-extrabold">${totalMax}</td>
+        <td class="${cellBase} text-center font-extrabold">${totalObtained}</td>
+        <td class="${cellBase}"></td>
+      </tr>
+
+      <!-- Result aligned under obtained -->
+      <tr>
+        <td class="${cellBase} text-center font-extrabold" colspan="3">نتیجہ</td>
+        <td class="${cellBase} text-center font-extrabold">${resultLabel}</td>
+        <td class="${cellBase}"></td>
+      </tr>
+
+      <tr>
+        <td class="${cellBase} text-center font-extrabold" colspan="3">نتیجہ فیصد</td>
+        <td class="${cellBase} text-center font-extrabold">${percentage.toFixed(0)}%</td>
+        <td class="${cellBase}"></td>
+      </tr>
+
+      <tr>
+        <td class="${cellBase} text-center font-extrabold" colspan="3">درجہ / گریڈ</td>
+        <td class="${cellBase} text-center font-extrabold">${gradeLabel}</td>
+        <td class="${cellBase}"></td>
+      </tr>
     </tbody>
   </table>
 
-  <div class="summary">
-    <div class="summary-card">
-      <div class="number">${totalObtained} / ${totalMax}</div>
-      <div class="desc">کل نمبر</div>
+  <!-- Footer -->
+  <div class="text-[12px] pt-4 border-t border-dotted border-gray-400 mb-6 font-medium" style="line-height: 1.9;">
+    <p>نوٹ: یہ نتیجہ کارڈ کا الیکٹرانک ورژن ہے، سہو کتابت اور غلطی کا احتمال موجود ہے۔ تفصیلات کے لیے شعبہ امتحانات سے رابطہ کریں۔</p>
+  </div>
+
+  <!-- Bottom -->
+  <div class="flex justify-between items-end text-[13px] mt-10" style="line-height: 1.7;">
+    <div>
+      <p class="font-semibold">پرنٹ کرنے کی تاریخ: ${printTimestamp}</p>
     </div>
-    <div class="summary-card">
-      <div class="number">${percentage.toFixed(1)}%</div>
-      <div class="desc">فیصد</div>
-    </div>
-    <div class="summary-card">
-      <div class="number">${passed ? "پاس" : "فیل"}</div>
-      <div class="desc">حیثیت</div>
+    <div class="text-center">
+      <div class="border-t border-dotted border-gray-500 pt-3 px-8 font-extrabold">کنٹرولر امتحانات</div>
     </div>
   </div>
 
-  <div class="footer">
-    <p>تاریخ اجراء: ${new Date().toLocaleDateString("ur-PK", { year: "numeric", month: "long", day: "numeric" })}</p>
-  </div>
 </body>
 </html>`;
 }
@@ -267,9 +321,20 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   let page: Page | null = null;
 
   try {
-    await connectDB();
     const { id } = await context.params;
     validateObjectId(id, "Student");
+
+    // Launching Chromium (1-3s cold start) does NOT depend on any DB data, so
+    // we kick it off in parallel with `connectDB()` + student/marks fetches.
+    // On warm lambdas this is essentially free; on cold starts we save the
+    // Chromium launch time by overlapping it with MongoDB work.
+    const browserPromise = getReusableBrowser(process.env.CHROME_PATH);
+    // If the browser promise rejects before we await it (e.g. binary missing),
+    // Node would otherwise log an "unhandled rejection" warning. Attach a
+    // no-op catch here; the real error surfaces when we `await` below.
+    browserPromise.catch(() => undefined);
+
+    await connectDB();
 
     const student = await getStudentByIdService(id);
     const studentObj = student.toObject() as Record<string, unknown>;
@@ -303,17 +368,23 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       passed
     );
 
-    const browser = await getReusableBrowser(process.env.CHROME_PATH);
+    const browser = await browserPromise;
     page = await browser.newPage();
-    await page.setViewport({ width: 1440, height: 0 });
+    // A4 portrait at 96 DPI: 794 × 1123 px. Matching the viewport to the
+    // target paper size prevents layout shifts between on-screen rendering
+    // and the final PDF.
+    await page.setViewport({ width: 794, height: 1123 });
+    // Tailwind CDN (`cdn.tailwindcss.com`) loads via an external script and
+    // JIT-compiles utility classes in-browser. If we used `domcontentloaded`
+    // Puppeteer would capture the PDF before Tailwind finishes, producing an
+    // unstyled document. `networkidle0` waits until the network is quiet,
+    // which gives the CDN time to fetch + compile before rendering.
     await page.setContent(html, { waitUntil: "networkidle0" });
-    await page.evaluateHandle("document.fonts.ready");
 
     const pdfBuffer = await page.pdf({
-      width: "1440px",
+      format: "A4",
       printBackground: true,
       preferCSSPageSize: true,
-      margin: { top: "50px", bottom: "64px" },
     });
 
     return new NextResponse(Buffer.from(pdfBuffer), {
@@ -321,6 +392,11 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="report-${String(studentObj.rollNumber ?? id)}.pdf"`,
+        // No CDN caching: the PDF must reflect the admin's latest edits
+        // (marks, course names, student info) in real time. We rely on
+        // parallel browser launch + MongoDB fetches to keep latency low
+        // (~1-3s warm, ~2-4s cold) instead of serving stale cached copies.
+        "Cache-Control": "private, no-store, max-age=0, must-revalidate",
       },
     });
   } catch (error: unknown) {

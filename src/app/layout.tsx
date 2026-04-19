@@ -11,8 +11,8 @@ const urduFont = Noto_Nastaliq_Urdu({
 });
 
 export const metadata: Metadata = {
-  title: "اسکول ایڈمن ڈیش بورڈ",
-  description: "اسکول مینجمنٹ سسٹم — طلباء، جماعتیں، مضامین اور نمبرات کا انتظام",
+  title: "ایڈمن ڈیش بورڈ",
+  description: "طلباء، جماعتیں، مضامین اور نمبرات کا انتظام",
 };
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ur" dir="rtl" className={`${urduFont.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-[var(--font-urdu)]">
+      <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
       </body>
     </html>

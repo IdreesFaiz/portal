@@ -95,7 +95,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <h1 className="text-base font-bold tracking-tight">اسکول ایڈمن</h1>
+              <h1 className="text-base font-bold tracking-tight">ایڈمن پورٹل</h1>
               <p className="text-[11px] text-slate-500 font-medium">مینجمنٹ سسٹم</p>
             </div>
           )}

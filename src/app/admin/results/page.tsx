@@ -96,16 +96,6 @@ export default function ResultsPage() {
 
   const handleEdit = useCallback((data: Student) => updateMutation.mutate(data), [updateMutation]);
   const handleDelete = useCallback(() => deleteMutation.mutate(), [deleteMutation]);
-  const handleDownloadReport = useCallback((student: StudentWithId) => {
-    const popup = window.open(
-      apiRoutes.studentReport(student._id),
-      "_blank",
-      "noopener,noreferrer"
-    );
-    if (popup) {
-      popup.opener = null;
-    }
-  }, []);
 
   const filteredStudents = useMemo(() => {
     const list = students ?? [];
@@ -234,12 +224,14 @@ export default function ResultsPage() {
           >
             <Trash2 className="w-3.5 h-3.5" /> حذف
           </button>
-          <button
-            onClick={() => handleDownloadReport(row)}
+          <a
+            href={apiRoutes.studentReport(row._id)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition border border-emerald-100"
           >
             <FileDown className="w-3.5 h-3.5" /> پی ڈی ایف
-          </button>
+          </a>
         </div>
       ),
     },

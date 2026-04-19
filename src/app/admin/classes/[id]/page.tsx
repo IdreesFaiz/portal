@@ -63,13 +63,6 @@ export default function ClassDetailPage({ params }: PageProps) {
     }
   }, [promoteTargetId, id, queryClient, showSuccess, showError]);
 
-  const openReportInNewTab = useCallback((studentId: string) => {
-    const popup = window.open(apiRoutes.studentReport(studentId), "_blank", "noopener,noreferrer");
-    if (popup) {
-      popup.opener = null;
-    }
-  }, []);
-
   if (classLoading)
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -121,12 +114,14 @@ export default function ClassDetailPage({ params }: PageProps) {
       key: "actions",
       header: "عمل",
       render: (row) => (
-        <button
-          onClick={() => openReportInNewTab(row._id)}
+        <a
+          href={apiRoutes.studentReport(row._id)}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition border border-emerald-100"
         >
           <FileDown className="w-3.5 h-3.5" /> رپورٹ
-        </button>
+        </a>
       ),
     },
   ];

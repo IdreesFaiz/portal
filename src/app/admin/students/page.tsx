@@ -11,6 +11,7 @@ import {
   Loader2,
   Users,
   Filter,
+  Eye,
 } from "lucide-react";
 import { useGetStudents } from "@/hooks/useGetStudents";
 import { useGetClasses } from "@/hooks/useGetClasses";
@@ -21,6 +22,7 @@ import { useApiMutation } from "@/hooks/use-api";
 import { useNotification } from "@/hooks/useNotification";
 import DataTable, { type Column } from "@/components/DataTable";
 import StudentFormModal from "@/components/forms/StudentFormModal";
+import StudentDetailModal from "@/components/StudentDetailModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ErrorBanner from "@/components/ErrorBanner";
 import SuccessBanner from "@/components/SuccessBanner";
@@ -41,6 +43,7 @@ export default function StudentsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentWithId | null>(null);
   const [filterYear, setFilterYear] = useState("");
@@ -121,16 +124,6 @@ export default function StudentsPage() {
 
   const handleEdit = useCallback((data: Student) => updateMutation.mutate(data), [updateMutation]);
   const handleDelete = useCallback(() => deleteMutation.mutate(), [deleteMutation]);
-  const handleDownloadReport = useCallback((student: StudentWithId) => {
-    const popup = window.open(
-      apiRoutes.studentReport(student._id),
-      "_blank",
-      "noopener,noreferrer"
-    );
-    if (popup) {
-      popup.opener = null;
-    }
-  }, []);
 
   const handleExportExcel = useCallback(async () => {
     setExporting(true);
@@ -218,6 +211,15 @@ export default function StudentsPage() {
           <button
             onClick={() => {
               setSelectedStudent(row);
+              setViewOpen(true);
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 rounded-lg hover:bg-slate-100 transition border border-slate-200"
+          >
+            <Eye className="w-3.5 h-3.5" /> دیکھیں
+          </button>
+          <button
+            onClick={() => {
+              setSelectedStudent(row);
               setEditOpen(true);
             }}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-100"
@@ -233,12 +235,14 @@ export default function StudentsPage() {
           >
             <Trash2 className="w-3.5 h-3.5" /> حذف
           </button>
-          <button
-            onClick={() => handleDownloadReport(row)}
+          <a
+            href={apiRoutes.studentReport(row._id)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition border border-emerald-100"
           >
             <FileDown className="w-3.5 h-3.5" /> پی ڈی ایف
-          </button>
+          </a>
         </div>
       ),
     },
@@ -364,6 +368,14 @@ export default function StudentsPage() {
         loading={updateMutation.isPending}
         initialData={editInitialData}
         title="طالب علم میں ترمیم"
+      />
+      <StudentDetailModal
+        open={viewOpen}
+        onClose={() => {
+          setViewOpen(false);
+          setSelectedStudent(null);
+        }}
+        student={selectedStudent}
       />
       <ConfirmDialog
         open={deleteOpen}

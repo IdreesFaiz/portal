@@ -57,7 +57,7 @@ export default function LoginPage() {
             <GraduationCap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">ایڈمن لاگ ان</h1>
-          <p className="text-sm text-slate-400 mt-2">اسکول مینجمنٹ سسٹم میں خوش آمدید</p>
+          <p className="text-sm text-slate-400 mt-2">پورٹل میں خوش آمدید</p>
         </div>
 
         {/* Login Card */}

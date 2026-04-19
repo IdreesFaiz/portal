@@ -50,3 +50,27 @@ export function evaluateFinalResult(courseMarks: readonly CourseMark[]): {
     passed: allSubjectsPassed,
   };
 }
+
+/**
+ * Maps a final percentage + pass flag to an Urdu grade label
+ * (درجہ / گریڈ). Centralised so both the public result card and the PDF
+ * report stay in sync if the grading bands ever change.
+ */
+export function computeGradeLabel(percentage: number, passed: boolean): string {
+  if (!passed) {
+    return "ناکام";
+  }
+  if (percentage >= 80) {
+    return "ممتاز";
+  }
+  if (percentage >= 70) {
+    return "اول";
+  }
+  if (percentage >= 60) {
+    return "دوم";
+  }
+  if (percentage >= 50) {
+    return "سوم";
+  }
+  return "کامیاب";
+}
