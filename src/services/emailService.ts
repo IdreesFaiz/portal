@@ -13,9 +13,7 @@ function escapeHtml(str: string): string {
 
 /** Base URL for the public result portal link in emails. */
 function getBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
+  return "https://portal-lac-zeta.vercel.app/";
 }
 
 /**
